@@ -1,0 +1,175 @@
+﻿@page "/animals"
+@using STGenetics.Pages;
+@using STGenetics.Shared.Models;
+@inject IAnimalService AnimalService
+
+
+<h1>Animal Page</h1>
+
+<!-- Botón para agregar un nuevo animal -->
+<button @onclick="ShowAnimalForm">Add Animal</button>
+
+<!-- Grid para mostrar la lista de animales -->
+<AnimalGrid @ref="animalGrid" Animals="@Animals" OnAnimalSelected="@HandleAnimalSelected" />
+
+<!-- Formulario para agregar o editar animales -->
+<AnimalForm @ref="animalForm" OnAnimalSaved="@HandleAnimalSaved" />
+
+<hr />
+
+<!-- Detalles del animal seleccionado -->
+@if (selectedAnimal != null)
+{
+    <h3>Selected Animal Details</h3>
+    <div>
+        <strong>Name:</strong> @selectedAnimal.Name<br />
+        <strong>Breed:</strong> @selectedAnimal.Breed<br />
+        <strong>Birth Date:</strong> @selectedAnimal.BirthDate.ToShortDateString()<br />
+        <strong>Sex:</strong> @selectedAnimal.Sex<br />
+        <strong>Price:</strong> $@selectedAnimal.Price<br />
+        <strong>Status:</strong> @selectedAnimal.Status<br />
+    </div>
+}
+
+<!-- Tabla de animales -->
+<div class="grid-container">
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Breed</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var animal in Animals)
+            {
+                <tr>
+                    <td>@animal.Name</td>
+                    <td>@animal.Breed</td>
+                    <td>
+                        <button @onclick="() => HandleAnimalSelected(animal)">Details</button>
+                        <button @onclick="() => EditAnimal(animal)">Edit</button>
+                        <button @onclick="() => DeleteAnimal(animal)">Delete</button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+<!-- Información de compra -->
+<h3>Purchase Information</h3>
+<div>
+    <strong>Total Animals Selected:</strong> @selectedAnimalsCount<br />
+    <strong>Total Purchase Amount:</strong> $@totalPurchaseAmount<br />
+    <strong>Discount:</strong> @discountPercentage%<br />
+    <strong>Discount Amount:</strong> $@discountAmount<br />
+    <strong>Shipping Cost:</strong> $@shippingCost<br />
+    <strong>Total Cost:</strong> $@totalCost
+</div>
+
+@code {
+    private List<Animal> Animals { get; set; } = new List<Animal>();
+    private AnimalGrid animalGrid;
+    private AnimalForm animalForm;
+    private Animal selectedAnimal;
+    private int selectedAnimalsCount => selectedAnimals.Count();
+    private decimal totalPurchaseAmount { get; set; }
+    private decimal discountPercentage { get; set; }
+    private decimal discountAmount { get; set; }
+    private decimal shippingCost { get; set; }
+    private decimal totalCost { get; set; }
+
+    private IEnumerable<Animal> selectedAnimals => Animals.Where(animal => animal.Selected);
+
+    private void ShowAnimalForm()
+    {
+        // Limpiar el formulario y mostrarlo para agregar un nuevo animal
+        animalForm.ClearForm();
+        animalForm.Show();
+    }
+
+    private void HandleAnimalSelected(Animal animal)
+    {
+        // Mostrar el formulario con los detalles del animal seleccionado
+        animalForm.LoadAnimal(animal);
+        animalForm.Show();
+        selectedAnimal = animal;
+
+        // Llamar a UpdatePurchaseInformation para actualizar la información de compra
+        UpdatePurchaseInformation();
+    }
+
+    private void EditAnimal(Animal animal)
+    {
+        // Asigna el animal seleccionado al formulario para editar
+        animalForm.LoadAnimal(animal);
+        animalForm.Show();
+
+        // Llamar a UpdatePurchaseInformation para actualizar la información de compra
+        UpdatePurchaseInformation();
+    }
+
+    private async Task DeleteAnimal(Animal animal)
+    {
+        // Lógica para eliminar el animal
+        await AnimalService.DeleteAnimalAsync(animal.AnimalId);
+
+        // Actualiza la lista de animales después de la eliminación
+        Animals = await AnimalService.GetAnimalsAsync();
+        await animalGrid.RefreshAsync(); // Llama a RefreshAsync
+
+        // Llamar a UpdatePurchaseInformation para actualizar la información de compra
+        UpdatePurchaseInformation();
+    }
+
+
+
+    private async Task HandleAnimalSaved(Animal savedAnimal)
+    {
+        // Guardar o actualizar el animal en la lista
+        if (savedAnimal.AnimalId == 0)
+        {
+            // Nuevo animal: asignar un nuevo AnimalId
+            savedAnimal.AnimalId = Animals.Any() ? Animals.Max(a => a.AnimalId) + 1 : 1;
+            Animals.Add(savedAnimal);
+        }
+        else
+        {
+            // Actualizar animal existente
+            var existingAnimal = Animals.FirstOrDefault(a => a.AnimalId == savedAnimal.AnimalId);
+            if (existingAnimal != null)
+            {
+                existingAnimal.Name = savedAnimal.Name;
+                existingAnimal.Breed = savedAnimal.Breed;
+                existingAnimal.BirthDate = savedAnimal.BirthDate;
+                existingAnimal.Sex = savedAnimal.Sex;
+                existingAnimal.Price = savedAnimal.Price;
+                existingAnimal.Status = savedAnimal.Status;
+            }
+        }
+
+        // Actualizar el grid
+        await animalGrid.RefreshAsync();
+
+        // Ocultar el formulario
+        animalForm.Hide();
+    }
+
+    // Lógica para aplicar descuentos y calcular montos de compra
+    private void UpdatePurchaseInformation()
+    {
+        totalPurchaseAmount = selectedAnimals.Sum(animal => animal.Price);
+        discountPercentage = selectedAnimalsCount > 5 ? 5 : 0;
+        discountAmount = (totalPurchaseAmount * discountPercentage) / 100;
+        shippingCost = selectedAnimalsCount > 20 ? 0 : 1000;
+        totalCost = totalPurchaseAmount - discountAmount + shippingCost;
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Cargar la lista inicial de animales
+        Animals = await AnimalService.GetAnimalsAsync();
+    }
+}

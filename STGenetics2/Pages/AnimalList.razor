@@ -1,0 +1,69 @@
+﻿@page "/animal-list"
+@using STGenetics.Shared.Models
+@using STGenetics.Shared.Services;
+@inject IAnimalService AnimalService
+
+<h1>Animal List</h1>
+
+<!-- Botón para agregar un nuevo animal -->
+<button @onclick="ShowAnimalForm">Add Animal</button>
+
+<!-- Grid para mostrar la lista de animales -->
+<AnimalGrid @ref="animalGrid" Animals="@Animals" OnAnimalSelected="@HandleAnimalSelected" />
+
+<!-- Formulario para agregar o editar animales -->
+<AnimalForm @ref="animalForm" OnAnimalSaved="@HandleAnimalSaved" />
+
+@code {
+    private List<Animal> Animals { get; set; } = new List<Animal>();
+    private AnimalGrid animalGrid;
+    private AnimalForm animalForm;
+
+    private void ShowAnimalForm()
+    {
+        // Limpiar el formulario y mostrarlo para agregar un nuevo animal
+        animalForm.ClearForm();
+        animalForm.Show();
+    }
+
+    private void HandleAnimalSelected(Animal animal)
+    {
+        // Mostrar el formulario con los detalles del animal seleccionado
+        animalForm.LoadAnimal(animal);
+        animalForm.Show();
+    }
+
+    private async Task HandleAnimalSaved(Animal savedAnimal)
+    {
+        // Guardar o actualizar el animal en la lista
+        if (savedAnimal.AnimalId == 0)
+        {
+            // Nuevo animal: asignar un nuevo AnimalId
+            savedAnimal.AnimalId = Animals.Any() ? Animals.Max(a => a.AnimalId) + 1 : 1;
+            Animals.Add(savedAnimal);
+        }
+        else
+        {
+            // Actualizar animal existente
+            var existingAnimal = Animals.FirstOrDefault(a => a.AnimalId == savedAnimal.AnimalId);
+            if (existingAnimal != null)
+            {
+                existingAnimal.Name = savedAnimal.Name;
+                existingAnimal.Breed = savedAnimal.Breed;
+                // Actualizar otras propiedades según sea necesario
+            }
+        }
+
+        // Actualizar el grid
+        animalGrid.Refresh();
+
+        // Ocultar el formulario
+        animalForm.Hide();
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Cargar la lista inicial de animales
+        Animals = await AnimalService.GetAnimalsAsync();
+    }
+}

@@ -1,0 +1,102 @@
+﻿@using STGenetics.Shared.Models
+
+<div class="form-popup" style="display: @(IsFormVisible ? "block" : "none")">
+    <div class="form-container">
+        <h2>Animal Form</h2>
+
+        <label for="name"><b>Name</b></label>
+        <input type="text" placeholder="Enter Name" @bind="Animal.Name">
+
+        <label for="breed"><b>Breed</b></label>
+        <input type="text" placeholder="Enter Breed" @bind="Animal.Breed">
+
+        <label for="birthDate"><b>Birth Date</b></label>
+        <input type="date" @bind="Animal.BirthDate">
+
+        <label for="sex"><b>Sex</b></label>
+        <select @bind="Animal.Sex">
+            <option value="Male">Male</option>
+            <option value="Female">Female</option>
+        </select>
+
+        <label for="price"><b>Price</b></label>
+        <input type="number" placeholder="Enter Price" @bind="Animal.Price">
+
+        <label for="status"><b>Status</b></label>
+        <select @bind="Animal.Status">
+            <option value="Active">Active</option>
+            <option value="Inactive">Inactive</option>
+        </select>
+
+        <button @onclick="Save">Save</button>
+        <button @onclick="Hide">Cancel</button>
+    </div>
+</div>
+
+@code {
+    private Animal Animal { get; set; } = new Animal();
+    private Animal OriginalAnimal { get; set; } = null;
+    private bool IsFormVisible { get; set; } = false;
+
+    [Parameter] public EventCallback<Animal> OnAnimalSaved { get; set; }
+
+    public void ClearForm()
+    {
+        Animal = new Animal();
+    }
+
+    public void LoadAnimal(Animal animal)
+    {
+        Animal = new Animal
+            {
+                AnimalId = animal.AnimalId,
+                Name = animal.Name,
+                Breed = animal.Breed,
+                BirthDate = animal.BirthDate,
+                Sex = animal.Sex,
+                Price = animal.Price,
+                Status = animal.Status
+            };
+    }
+
+    public void Show()
+    {
+        IsFormVisible = true;
+    }
+
+    public void Hide()
+    {
+        IsFormVisible = false;
+    }
+
+    public void EditAnimal(Animal animal)
+    {
+        IsFormVisible = true;
+        OriginalAnimal = animal;
+        LoadAnimal(animal);
+    }
+
+    private async Task Save()
+    {
+        if (OriginalAnimal != null)
+        {
+            // Update the original animal
+            OriginalAnimal.Name = Animal.Name;
+            OriginalAnimal.Breed = Animal.Breed;
+            OriginalAnimal.BirthDate = Animal.BirthDate;
+            OriginalAnimal.Sex = Animal.Sex;
+            OriginalAnimal.Price = Animal.Price;
+            OriginalAnimal.Status = Animal.Status;
+
+            await OnAnimalSaved.InvokeAsync(OriginalAnimal);
+        }
+        else
+        {
+            // Add a new animal
+            await OnAnimalSaved.InvokeAsync(Animal);
+        }
+
+        ClearForm();
+        IsFormVisible = false;
+    }
+}

@@ -1,0 +1,164 @@
+﻿<!-- AnimalGrid.razor -->
+@page "/animal-grid"
+@using STGenetics.Pages;
+@using STGenetics.Shared.Models
+
+<div class="search-container">
+    <input type="text" placeholder="Search by name" @bind="searchTerm" />
+    <button @onclick="Search">Search</button>
+</div>
+
+<div class="grid-container">
+    <table class="table">
+        <thead>
+            <tr>
+                <th>
+                    <SortHeader @onclick="() => SortAnimals(a => a.Name)">Name</SortHeader>
+                </th>
+                <th>
+                    <SortHeader @onclick="() => SortAnimals(a => a.Breed)">Breed</SortHeader>
+                </th>
+                <th>
+                    <SortHeader @onclick="() => SortAnimals(a => a.BirthDate)">Birth Date</SortHeader>
+                </th>
+                <th>
+                    <SortHeader @onclick="() => SortAnimals(a => a.Sex)">Sex</SortHeader>
+                </th>
+                <th>
+                    <SortHeader @onclick="() => SortAnimals(a => a.Price)">Price</SortHeader>
+                </th>
+                <th>
+                    <SortHeader @onclick="() => SortAnimals(a => a.Status)">Status</SortHeader>
+                </th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var animal in DisplayedAnimals)
+            {
+                <tr>
+                    <td>@animal.Name</td>
+                    <td>@animal.Breed</td>
+                    <td>@animal.BirthDate.ToShortDateString()</td>
+                    <td>@animal.Sex</td>
+                    <td>@animal.Price.ToString("C")</td>
+                    <td>@animal.Status</td>
+                    <td>
+                        <button @onclick="() => OnAnimalSelected(animal)">Details</button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+<!-- Paginación -->
+<div class="pagination">
+    <button @onclick="GoToPreviousPage" disabled="@IsFirstPage">Previous</button>
+    <span>Page @CurrentPage of @TotalPages</span>
+    <button @onclick="GoToNextPage" disabled="@IsLastPage">Next</button>
+</div>
+
+@code {
+    [Parameter] public List<Animal> Animal { get; set; }
+    [Parameter] public EventCallback<Animal> OnAnimalSelected { get; set; }
+    private int PageSize = 10;
+    private int CurrentPage = 1;
+    private List<Animal> DisplayedAnimals { get; set; }
+    private bool IsFirstPage => CurrentPage == 1;
+    private bool IsLastPage => CurrentPage == TotalPages;
+    private int TotalPages => (int)Math.Ceiling((decimal)Animal.Count / PageSize);
+
+    private Func<Animal, IComparable> SortPredicate { get; set; }
+    private bool IsAscending { get; set; } = true;
+
+    private string searchTerm = "";
+
+    private void SortAnimals(Func<Animal, IComparable> predicate)
+    {
+        if (SortPredicate == predicate)
+            IsAscending = !IsAscending;
+        else
+            IsAscending = true;
+
+        SortPredicate = predicate;
+
+        if (IsAscending)
+            DisplayedAnimals = DisplayedAnimals.OrderBy(predicate).ToList();
+        else
+            DisplayedAnimals = DisplayedAnimals.OrderByDescending(predicate).ToList();
+
+        // Aplicar el filtrado después de ordenar
+        Search();
+    }
+
+    private void GoToPreviousPage()
+    {
+        if (!IsFirstPage)
+            CurrentPage--;
+    }
+
+    private void GoToNextPage()
+    {
+        if (!IsLastPage)
+            CurrentPage++;
+    }
+
+    private IEnumerable<Animal> GetAnimalsForCurrentPage()
+    {
+        return DisplayedAnimals.Skip((CurrentPage - 1) * PageSize).Take(PageSize);
+    }
+
+    private void UpdateDisplayedAnimals()
+    {
+        DisplayedAnimals = GetAnimalsForCurrentPage().ToList();
+    }
+
+    private async Task LoadData()
+    {
+        // Crear una instancia del servicio
+        var animalService = new AnimalService();
+
+        // Cargar los datos desde el servicio (carga desde el archivo JSON)
+        DisplayedAnimals = await animalService.GetAnimalsFromJson();
+
+        // Asegúrate de cargar los datos en DisplayedAnimals
+        UpdateDisplayedAnimals();
+    }
+    private void Search()
+    {
+        if (string.IsNullOrWhiteSpace(searchTerm))
+        {
+            DisplayedAnimals = GetAnimalsForCurrentPage().ToList();
+        }
+        else
+        {
+            DisplayedAnimals = Animal
+                .Where(a => a.Name.Contains(searchTerm, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+        }
+    }
+
+    public void Refresh()
+    {
+        UpdateDisplayedAnimals();
+        StateHasChanged(); // Notifica a Blazor para que actualice la interfaz de usuario
+    }
+
+    public async Task RefreshAsync()
+    {
+        // Lógica para actualizar la información en la grid
+        // Por ejemplo, puedes recargar los datos de la lista de animales
+        await LoadData();
+    }
+
+    protected override void OnParametersSet()
+    {
+        UpdateDisplayedAnimals();
+    }
+
+    protected override void OnInitialized()
+    {
+        UpdateDisplayedAnimals();
+    }
+}
